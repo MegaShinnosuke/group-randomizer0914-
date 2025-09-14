@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>グループ分けツール</title>
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "メイリオ", sans-serif;
+  padding: 15px;
+  background: #B0E0E6;
+  color: #111;
+}
+h1 { text-align:center; font-size:1.8em; margin-bottom:10px; }
+p { text-align:center; font-size:0.9em; margin-bottom:15px; }
+button {
+  display:block; width:100%; padding:12px; margin:10px 0;
+  font-size:16px; background:#B3F5DD; color:#111; border:none; border-radius:8px;
+  cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.3);
+}
+button:hover { transform:scale(1.02); box-shadow:0 4px 10px rgba(0,0,0,0.4); }
+#result {
+  white-space:pre-wrap; background:#fff; color:#111; padding:15px;
+  border:1px solid #ccc; border-radius:10px; margin-top:20px;
+  font-family:"Courier New", monospace; font-size:15px; max-height:300px; overflow-y:auto;
+}
+#nameGrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+.nameItem { display:flex; align-items:center; padding:6px 10px; border:1px solid #ccc; border-radius:6px; background:#e0ffff; cursor:pointer; }
+.nameItem.selected { background:#a0e0c0; }
+.nameItem input { margin-right:8px; }
+.modal { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:#fff; padding:20px; border-radius:12px; box-shadow:0 8px 20px rgba(0,0,0,0.4); width:90%; max-width:400px;
+}
+.modal input { width:100%; padding:10px; margin:8px 0; box-sizing:border-box; text-align:left; }
+.modal .actions { display:flex; gap:12px; margin-top:16px; }
+.modal .actions button { flex:1; }
+</style>
+</head>
+<body>
+
+<h1>グループ分けツール</h1>
+<p>チェックを入れた人だけでグループ分けできます（出力時に「ちゃん」が付きます）</p>
+
+<!-- 新規登録 & メンバー削除 -->
+<button onclick="openModal()">＋ 新規登録</button>
+<button onclick="deleteSelectedMembers()">メンバー削除</button>
+
+<!-- 名簿 -->
+<div id="nameGrid"></div>
+
+<button onclick="makeGroups()">👻 グループ作成</button>
+<button onclick="resetResult()">🗑 履歴リセット</button>
+<button onclick="copyResult()">✔️ 結果をコピー</button>
+
+<div id="result"></div>
+
+<!-- 新規登録モーダル -->
+<div id="modal" class="modal">
+<h2>🆕 メンバー登録</h2>
+<input type="text" id="newDisplay" placeholder="表示名を入力">
+<input type="text" id="newOutput" placeholder="出力名を入力">
+<div class="actions">
+  <button onclick="closeModal()">キャンセル</button>
+  <button onclick="addMember()">登録</button>
+</div>
+</div>
+
+<script>
+// 初期メンバー
+let members = [
+  { display: "Hei", output: "へいちゃん" },
+  { display: "sabaris", output: "さばちゃん" },
+  { display: "Lapis", output: "ラピちゃん" },
+  { display: "TAMA", output: "たまちゃん" },
+  { display: "しばじろう", output: "しばちゃん" },
+  { display: "しろ子", output: "しろちゃん" },
+  { display: "サクヤ", output: "わんわんサクちゃん" },
+  { display: "すい", output: "すいちゃん" },
+  { display: "たい", output: "たいちゃん" },
+  { display: "たかこっこ", output: "たかちゃん" },
+  { display: "ぬーえ", output: "ぬえちゃん" },
+  { display: "まみみ", output: "まみちゃん" },
+  { display: "まめしばぁぁぁ", output: "まめちゃん" },
+  { display: "み～こ", output: "み～ちゃん" },
+  { display: "めがむー", output: "めがちゃん" },
+  { display: "ももんが", output: "ももちゃん" },
+  { display: "りあ", output: "りあちゃん" },
+  { display: "アイリーン", output: "アイちゃん" },
+  { display: "コロボックル", output: "コロちゃん" },
+  { display: "ディ・マリア大佐", output: "ベジータちゃん" },
+  { display: "ミズキ", output: "ミズちゃん" },
+  { display: "メメノア", output: "メメちゃん" },
+  { display: "茶々", output: "ちゃちゃちゃん" },
+  { display: "Ren", output: "レンちゃん" },
+  { display: "シンノスケ", output: "しんちゃん" },
+  { display: "Echidna", output: "エキちゃん" },
+  { display: "カイ", output: "カイちゃん" }
+];
+
+const grid = document.getElementById("nameGrid");
+function renderGrid() {
+  grid.innerHTML = "";
+  members.forEach((m, idx) => {
+    const item = document.createElement("div");
+    item.className = "nameItem";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.id = "chk"+idx;
+    cb.addEventListener("change", () => {
+      item.classList.toggle("selected", cb.checked);
+    });
+    const label = document.createElement("label");
+    label.setAttribute("for","chk"+idx);
+    label.textContent = m.display;
+    item.appendChild(cb);
+    item.appendChild(label);
+    grid.appendChild(item);
+  });
+}
+renderGrid();
+
+// 新規登録モーダル
+function openModal(){ document.getElementById("modal").style.display="block"; }
+function closeModal(){ document.getElementById("modal").style.display="none"; }
+function addMember(){
+  const d = document.getElementById("newDisplay").value.trim();
+  const o = document.getElementById("newOutput").value.trim();
+  if(!d||!o) return;
+  members.push({ display:d, output:o+"ちゃん" });
+  renderGrid();
+  closeModal();
+}
+
+// メンバー削除
+function deleteSelectedMembers(){
+  if(!confirm("このメンバーを削除しますか？")) return;
+  for(let i=members.length-1;i>=0;i--){
+    const cb = document.getElementById("chk"+i);
+    if(cb && cb.checked) members.splice(i,1);
+  }
+  renderGrid();
+}
+
+// グループ作成
+function makeGroups(){
+  const checkedMembers = [];
+  members.forEach((m,idx)=>{
+    const cb = document.getElementById("chk"+idx);
+    if(cb && cb.checked) checkedMembers.push(m.output);
+  });
+  if(checkedMembers.length===0) return;
+
+  // シャッフル
+  for(let i=checkedMembers.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [checkedMembers[i],checkedMembers[j]]=[checkedMembers[j],checkedMembers[i]];
+  }
+
+  // 4人単位でグループ
+  const groups=[], groupSizes=[];
+  let remaining=checkedMembers.length;
+  while(remaining>0){
+    if(remaining>=4){ groupSizes.push(4); remaining-=4; }
+    else{ groupSizes.push(remaining); remaining=0; }
+  }
+  let index=0;
+  groupSizes.forEach(size=>{
+    groups.push(checkedMembers.slice(index,index+size));
+    index+=size;
+  });
+
+  // 出力
+  const groupLabels="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const now=new Date();
+  const dateStr=now.toLocaleDateString("ja-JP",{year:"2-digit",month:"2-digit",day:"2-digit"})+" "+now.toTimeString().slice(0,5);
+  let output="☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆\n";
+  output+=dateStr+" 時点\n※左の人から貼っていこー！\n\n";
+  groups.forEach((g,i)=>{
+    const label=`ｸﾞﾙｰﾌﾟ${groupLabels[i]}（${g.length}人）：`;
+    output+=label+g.join("、")+"\n-------------------------------\n";
+  });
+  output+="\n☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆";
+  document.getElementById("result").innerText=output;
+}
+
+// リセット・コピー
+function resetResult(){ document.getElementById("result").innerText=""; }
+function copyResult(){
+  navigator.clipboard.writeText(document.getElementById("result").innerText)
+  .then(()=>alert("コピーしました！"))
+  .catch(e=>alert("コピー失敗: "+e));
+}
+</script>
+</body>
+</html>
